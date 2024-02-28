@@ -26,7 +26,6 @@ from forest.poplar.legacy.common_funcs import datetime2stamp, stamp2datetime
 ACTIVE_STATUS_LIST = range(11)
 TRAVELLING_STATUS_LIST = range(11)
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 

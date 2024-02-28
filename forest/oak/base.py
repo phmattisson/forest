@@ -63,6 +63,7 @@ def accelerometer_file_viable(accelerometer_path):
     time_diff = second_timestamp - first_timestamp
     expected_dt = 10 * 10
     if abs(time_diff - expected_dt) > 20:
+        #print(f"time_diff", time_diff, f"second_timestamp ", second_timestamp, f"first_timestamp",first_timestamp)
         print(f"wrong sampling speed for tile")
         print(accelerometer_path)
         return False
@@ -101,7 +102,10 @@ def preprocess_bout(t_bout: np.ndarray, x_bout: np.ndarray, y_bout: np.ndarray,
             - t_bout_interp: resampled timestamp (in Unix)
             - vm_bout_interp: vector magnitude of acceleration
     """
-    t_bout_interp = t_bout - t_bout[0]
+    try:
+        t_bout_interp = t_bout - t_bout[0]
+    except Exception:
+        t_bout_interp = t_bout
        #philip lines
     print("Start:", t_bout_interp[0], "End:", t_bout_interp[-1], "Step size:", 1/fs)
     
@@ -509,10 +513,25 @@ def find_continuous_dominant_peaks(valid_peaks: np.ndarray, min_t: int,
 
 def extract_timestamp(file_name):
     parts = file_name.split('-')
+    
     try:
-        return datetime.utcfromtimestamp(int(parts[0]) / 1000)
+        # If file name not on format microseconds after 1970 
+        if int(parts[0])<10000:
+            date_part, time_part = parts[2].split(' ')
+            # Replace underscores with colons in the time part
+            time_part = time_part.replace('_', ':')
+            # Remove the colon from the timezone part
+            time_part = time_part.replace('+00:00', '+0000')
+            # Add microseconds to the time part before the timezone
+            time_part = time_part[:-5] + '.000000' + time_part[-5:]
+            # Now, join everything together
+            datetime_str = parts[0] + '-' + parts[1] + '-' + date_part + ' ' + time_part
+            return datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S.%f%z")
+        else:
+            return datetime.utcfromtimestamp(int(parts[0]) / 1000)
     except ValueError:
         print(f"Invalid timestamp in file name: {file_name}")
+        #datetime.strptime(parts, "%Y-%m-%d")
         return None
 
 
@@ -552,16 +571,22 @@ def preprocess_dates(
     
     # Convert timestamps to datetime objects
     dates = [extract_timestamp(file) for file in file_dates]
+    
+     # david line
+    #david commented out
     dates = [date for date in dates if date is not None]
 
     # If you need to convert timezones
+    
     from_zone = pytz.timezone('UTC')  # Adjust as needed
     to_zone = pytz.timezone('America/New_York')  # Replace with your target timezone
+   
 
 
     dates = [
         date.replace(tzinfo=from_zone).astimezone(to_zone) for date in dates
     ]
+     
     # trim dataset according to time_start and time_end
     if time_start is not None and time_end is not None:
         time_min = datetime.strptime(time_start, fmt)
@@ -569,8 +594,11 @@ def preprocess_dates(
         time_max = datetime.strptime(time_end, fmt)
         time_max = time_max.replace(tzinfo=from_zone).astimezone(to_zone)
         dates = [date for date in dates if time_min <= date <= time_max]
-
+    
     dates_shifted = [date-timedelta(hours=date.hour) for date in dates]
+    if not dates_shifted:
+        dates_shifted=dates
+
     # create time vector with days for analysis
     if time_start is None:
         date_start = dates_shifted[0]
@@ -678,14 +706,14 @@ def run(study_folder: str, output_folder: str, tz_str: Optional[str] = None,
         )
     if users is None:
         users = get_ids(study_folder)
-        index = users.index("rmzjfefw")
-        users = users[index:]
+        #index = users.index("17rh1tce")
+        #users = users[index:]
         print(f"users: {users}")
 
     for user in users:
         logger.info("Beiwe ID: %s", user)
         # get file list
-        source_folder = os.path.join(study_folder, user, "accel")
+        source_folder = os.path.join(study_folder, user, "accelerometer")
         if not os.path.exists(source_folder):
             logger.info("No accelerometer data for %s", user)
             continue
@@ -753,6 +781,8 @@ def run(study_folder: str, output_folder: str, tz_str: Optional[str] = None,
             for f in file_ind:
                 logger.info("File: %d", f)
                 file_path = os.path.join(source_folder, file_list[f])
+                #### David linje för debug. Ta bort
+                print(file_list[f])
                 #data = pd.concat([data, pd.read_csv(file_path)], axis=0)
 
                 
@@ -771,7 +801,7 @@ def run(study_folder: str, output_folder: str, tz_str: Optional[str] = None,
                 except Exception as e:
                     print(f"An error occurred while processing {file_path}: {e}")
                 
-
+            """
             # extract data
             if not accelerometer_file_viable(file_path):
                 logger.info("File %s is not viable", file_path)
@@ -785,7 +815,7 @@ def run(study_folder: str, output_folder: str, tz_str: Optional[str] = None,
             print(np.array(data["timestamp"]))
             if data.shape[0] == 0:
                 continue
-            
+            """
             try:
                 timestamp = np.array(data["timestamp"]) / 1000
             except TypeError:
@@ -811,20 +841,24 @@ def run(study_folder: str, output_folder: str, tz_str: Optional[str] = None,
             z = z[maskz]
             timestamp = timestamp[maskx]
             """
-            print("Start:", timestamp[0], "End:", timestamp[-1])
-            print(f"{type(timestamp[0])} {type(timestamp[-1])}")
+            #David commented out below
+            """
+            #print("Start:", timestamp[0], "End:", timestamp[-1])
+            #print(f"{type(timestamp[0])} {type(timestamp[-1])}")
             if np.isnan(timestamp[0]):
                 print("first nan")
                 continue
             if np.isnan(timestamp[-1]):
                 print("should have continued")
                 continue
+            """
             try:
-                t_bout_interp, vm_bout = preprocess_bout(timestamp, x, y, z)
+                if not data.empty: # David line to avoid crashing when reading an empty csv file
+                    t_bout_interp, vm_bout = preprocess_bout(timestamp, x, y, z)
             except ZeroDivisionError:
                 print(f"division by zero")
                 continue
-
+            
             # find walking and estimate cadence
             cadence_bout = find_walking(vm_bout)
             # distribute metrics across hours

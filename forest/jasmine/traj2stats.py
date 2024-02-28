@@ -1536,7 +1536,7 @@ def gps_quality_check(study_folder: str, study_id: str) -> float:
         quality_yes = 0.
         for i, _ in enumerate(file_path_array):
             try:
-                df = pd.read_csv(file_path_array[i], error_bad_lines=False, warn_bad_lines=True)
+                df = pd.read_csv(file_path_array[i])
             except UnicodeDecodeError:
                 print(f"unicode error")
                 quality_check = 0.
@@ -1696,7 +1696,7 @@ def gps_stats_main(
                 params_h = parameters.h
             if parameters.w is None:
                 try:
-                    params_w = np.mean(data.accuracy)
+                    params_w = np.mean(data.accuracy) 
                 except AttributeError:
                     print("No accuracy column in the data.")
                     continue
@@ -1752,9 +1752,11 @@ def gps_stats_main(
                     # Further processing if validation is successful
                 except ValueError as e:
                     print("trajectory failed:", e)
+                
+                    """ David commented out more
                     continue
 
-                """ philip commented this out 
+                 philip commented this out 
                 if (
                     np.max(traj[:, 1]) > 90
                     or np.min(traj[:, 1]) < -90
@@ -1770,10 +1772,8 @@ def gps_stats_main(
                         "[-90, 90] and [-180, 180]."
                     )
 
-                philip lines 
+                #philip lines 
  """
-         
-                
 
            
             # save all_memory_dict and all_bv_set
@@ -1846,3 +1846,6 @@ def gps_stats_main(
                 "GPS data are not collected"
                 " or the data quality is too low"
             )
+            
+        
+
